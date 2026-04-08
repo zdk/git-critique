@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -eu
+
+bold="\033[1m"
+reset="\033[0m"
+
+since="1 year ago"
+n=10
+
+echo -e "${bold}Reviewing the last year of git history...${reset}\n"
+
+echo -e "${bold}These files keep changing:${reset}"
+git log --format=format: --name-only --since="$since" \
+  | sed '/^\s*$/d' | sort | uniq -c | sort -nr | head -n $n \
+  | awk '{ printf "  %4d  %s\n", $1, $2 }'
+
+echo
+echo -e "${bold}Who's behind this:${reset}"
+git shortlog -sn --no-merges | head -n $n \
+  | awk '{ printf "  %4d  ", $1; $1=""; print substr($0,2) }'
+
+echo
+echo -e "${bold}Where the bugs live:${reset}"
+bugs=$(git log -i -E --grep="fix|bug|broken" --name-only --format='' --since="$since" \
+  | sed '/^\s*$/d' | sort | uniq -c | sort -nr | head -n $n)
+if [[ -n "$bugs" ]]; then
+  echo "$bugs" | awk '{ printf "  %4d  %s\n", $1, $2 }'
+else
+  echo "  Nothing jumps out — looking clean."
+fi
+
+echo
+echo -e "${bold}How active is this project:${reset}"
+colors=("\033[31m" "\033[32m" "\033[33m" "\033[34m" "\033[35m" "\033[36m")
+i=0
+while read count month; do
+  c=${colors[$((i % 6))]}
+  bar=$(printf '█%.0s' $(seq 1 $count))
+  echo -e "  ${month}:  ${c}${bar}${reset} ${count}"
+  i=$((i + 1))
+done < <(git log --format='%ad' --date=format:'%Y-%m' --since="$since" \
+  | sort | uniq -c)
+
+echo
+echo -e "${bold}Any fires lately:${reset}"
+fires=$(git log --since="$since" --date=short --pretty=format:'%ad %s' \
+  | grep -iE 'revert|hotfix|emergency|rollback' || true)
+if [[ -n "$fires" ]]; then
+  while read -r line; do echo "  $line"; done <<< "$fires"
+else
+  echo "  All quiet. No reverts, hotfixes, or rollbacks."
+fi
