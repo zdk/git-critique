@@ -17,7 +17,7 @@ cd your-git-repo
 git critique
 ```
 
-Example output:
+## Example output:
 
 ```
 Reviewing the last year of git history...
